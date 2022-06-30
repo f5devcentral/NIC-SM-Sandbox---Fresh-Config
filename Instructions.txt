@@ -31,7 +31,7 @@ curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-
 sudo install minikube-linux-amd64 /usr/local/bin/minikube
 #Set k8s version to be supported with SM version (already set to 1.22.1 for SM 1.4.1)
 minikube start --kubernetes-version=1.22.1 --cpus=4 --memory=6Gb --cni=calico --nodes=2
-*--WAIT--*
+*--WAIT--* ~3m
 alias k="minikube kubectl --"
 k get nodes
 
@@ -44,7 +44,7 @@ sudo chmod +x /usr/local/bin/nginx-meshctl
 export ver=1.4.1
 nginx-meshctl deploy --disable-auto-inject --enabled-namespaces="bookinfo"  --mtls-mode=strict --mtls-trust-domain=nginx.mesh --registry-server=docker-registry.nginx.com/nsm --image-tag $ver
 #--enabled-namespaces="bookinfo" 
-*--WAIT--*
+*--WAIT--* ~5m
 - Verify 
 #all pods should be up
 k get pods -n nginx-mesh
@@ -57,7 +57,7 @@ nginx-meshctl version
 --DEPLOY AN APP TO SM
 k create namespace bookinfo
 k apply -f https://raw.githubusercontent.com/istio/istio/release-1.14/samples/bookinfo/platform/kube/bookinfo.yaml -n bookinfo
-*--WAIT--* about 5m
+*--WAIT--* ~2m
 - Verify 
 #all pods should be up within about 2m. there is a delay on the productpage pod so it comes up last. 
 watch minikube kubectl -- get pods -n bookinfo
@@ -99,7 +99,7 @@ k apply -f https://raw.githubusercontent.com/f5devcentral/NIC-SM-Sandbox---Fresh
 #Changed Replicas, Under podSpec set hostNetwork, add Volumes, Volume Mounts, Args & Annotations: https://docs.nginx.com/nginx-service-mesh/tutorials/kic/deploy-with-kic/#install-with-manifests
 #Changed container image path
 
-*--WAIT--* about 90s
+*--WAIT--* ~90s
 k get pods -n nginx-ingress -o wide 
 #Note the IP addresses these are running on (these are bridged to the node (host) IP's)
 k get pods -n bookinfo -o wide
