@@ -3,8 +3,9 @@
 - https://multipass.run/
 - Deploy ubuntu VM (needs to be big to host k8's cluster w/ SM and NIC+)
 multipass launch --cpus 4 --disk 20G --mem 12G
-Launched: admired-rabbit  
+#Output: Launched: admired-rabbit  
 multipass shell admired-rabbit
+#From this point everything will be configured within the admired-rabbit VM....or whatever fun name Multipass gave yours. 
 
 --INSTALL DOCKER
 sudo apt-get update
@@ -70,6 +71,7 @@ minikube kubectl -- exec -it $(minikube kubectl -- get pod -l app=ratings -n boo
 #Open second terminal on mac and a second session to the mulitpass vm 
 MAC> Terminal> multipass shell admired-rabbit
 watch nginx-meshctl top -n bookinfo
+#Expected Output:
 ubuntu@sharp-chinook:~$ nginx-meshctl top -n bookinfo
 Deployment      Incoming Success  Outgoing Success  NumRequests
 ratings-v1      100.00%           100.00%           263
@@ -106,6 +108,7 @@ k get pods -n bookinfo -o wide
 --TESTING THE APP
 - curl to one of the ingress controller ips from above command "k get pods -n nginx-ingress -o wide"
 curl 192.168.49.2
+#Expected Output:
 ubuntu@sharp-chinook:~/kubernetes-ingress/deployments$ curl 192.168.49.2
 <html>
 <head><title>404 Not Found</title></head>
