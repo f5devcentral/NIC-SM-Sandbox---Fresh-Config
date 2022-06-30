@@ -7,3 +7,5 @@ The entire environment will run on a single VM running locally on your MAC/PC an
 By using a free multipass Ubuntu VM and Minikube we can all start with a common operating environment and have fun working with the tools rather than troubleshooting OS environment variables. 
 
 This guide was developed and tested on Macbook only. If you are on a PC, YMMV. 
+
+Start by copying or opening Instructions.txt into Vscode (or your fav txt editor) so you get nice colorized txt formatting. 
