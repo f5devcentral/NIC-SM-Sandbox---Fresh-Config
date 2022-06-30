@@ -1,0 +1,154 @@
+#For installing K8s v1.22.1, SM 1.4.1 and NIC+ 2.2.2
+--INSTALL MULTIPASS
+- https://multipass.run/
+- Deploy ubuntu VM (needs to be big to host k8's cluster w/ SM and NIC+)
+multipass launch --cpus 4 --disk 20G --mem 12G
+Launched: admired-rabbit  
+multipass shell admired-rabbit
+
+--INSTALL DOCKER
+sudo apt-get update
+sudo apt-get install \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo gpasswd -a $USER docker
+newgrp docker
+docker run hello-world
+
+
+--INSTALL & LAUNCH MINIKUBE
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+#Set k8s version to be supported with SM version (already set to 1.22.1 for SM 1.4.1)
+minikube start --kubernetes-version=1.22.1 --cpus=4 --memory=6Gb --cni=calico --nodes=2
+*--WAIT--*
+alias k="minikube kubectl --"
+k get nodes
+
+
+--INSTALL & CONFIGURE NGINX SERVICE MESH
+- Download ServiceMesh from downloads.f5.com - just "nginx-meshctl_linux.gz"
+gunzip nginx-meshctl_linux.gz
+sudo mv nginx-meshctl_linux /usr/local/bin/nginx-meshctl
+sudo chmod +x /usr/local/bin/nginx-meshctl
+export ver=1.4.1
+nginx-meshctl deploy --disable-auto-inject --enabled-namespaces="bookinfo"  --mtls-mode=strict --mtls-trust-domain=nginx.mesh --registry-server=docker-registry.nginx.com/nsm --image-tag $ver
+#--enabled-namespaces="bookinfo" 
+*--WAIT--*
+- Verify 
+#all pods should be up
+k get pods -n nginx-mesh
+nginx-meshctl version
+#Output:
+  nginx-meshctl - v1.4.1
+  nginx-mesh-api - v1.4.1
+  nginx-mesh-metrics - v1.4.1
+
+--DEPLOY AN APP TO SM
+k create namespace bookinfo
+k apply -f https://raw.githubusercontent.com/istio/istio/release-1.14/samples/bookinfo/platform/kube/bookinfo.yaml -n bookinfo
+*--WAIT--* about 5m
+- Verify 
+#all pods should be up within about 2m. there is a delay on the productpage pod so it comes up last. 
+watch minikube kubectl -- get pods -n bookinfo
+
+#Test
+minikube kubectl --  exec -it $(minikube kubectl --  get pod -l app=ratings -n bookinfo -o jsonpath='{.items[0].metadata.name}') -n bookinfo -c ratings -- bash -c 'while true; do curl -I productpage:9080/productpage?u=normal; done'
+#Look for response header: X-Mesh-Request-ID: 251702038deacf670ea58c1dd917c3c8
+
+#Generate Traffic 
+minikube kubectl -- exec -it $(minikube kubectl -- get pod -l app=ratings -n bookinfo -o jsonpath='{.items[0].metadata.name}') -n bookinfo -c ratings -- bash -c 'while true; do curl -I productpage:9080/productpage?u=normal; done'
+#Open second terminal on mac and a second session to the mulitpass vm 
+MAC> Terminal> multipass shell admired-rabbit
+watch nginx-meshctl top -n bookinfo
+ubuntu@sharp-chinook:~$ nginx-meshctl top -n bookinfo
+Deployment      Incoming Success  Outgoing Success  NumRequests
+ratings-v1      100.00%           100.00%           263
+reviews-v3      100.00%           100.00%           5
+productpage-v1  100.00%           100.00%           264
+reviews-v1      100.00%                             255
+details-v1      100.00%                             261
+
+
+--INSTALL NIC+
+cd $HOME
+git clone https://github.com/nginxinc/kubernetes-ingress.git --branch v2.2.2
+cd kubernetes-ingress/deployments
+- Configure RBAC & CRD's
+k apply -f common/ns-and-sa.yaml && k apply -f rbac/rbac.yaml && k apply -f common/default-server-secret.yaml && k apply -f common/nginx-config.yaml && k apply -f common/ingress-class.yaml
+k apply -f common/crds/k8s.nginx.org_virtualservers.yaml && k apply -f common/crds/k8s.nginx.org_virtualserverroutes.yaml
+k apply -f common/crds/k8s.nginx.org_transportservers.yaml && k apply -f common/crds/k8s.nginx.org_policies.yaml && k apply -f common/crds/k8s.nginx.org_globalconfigurations.yaml
+
+- Create Secret
+k create secret docker-registry regcred --docker-server=private-registry.nginx.com --docker-username=<your jwt token> --docker-password=none -n nginx-ingress
+k get secret regcred --output=yaml -n nginx-ingress
+
+- Deploy NIC+ manifest
+k apply -f https://raw.githubusercontent.com/f5devcentral/NIC-SM-Sandbox---Fresh-Config/main/nginx-plus-ingress-v1.yaml 
+#Changed Replicas, Under podSpec set hostNetwork, add Volumes, Volume Mounts, Args & Annotations: https://docs.nginx.com/nginx-service-mesh/tutorials/kic/deploy-with-kic/#install-with-manifests
+#Changed container image path
+
+*--WAIT--* about 90s
+k get pods -n nginx-ingress -o wide 
+#Note the IP addresses these are running on (these are bridged to the node (host) IP's)
+k get pods -n bookinfo -o wide
+#Note the IP's and nodes these are running on. These are internal to the cluster. 
+
+--TESTING THE APP
+- curl to one of the ingress controller ips from above command "k get pods -n nginx-ingress -o wide"
+curl 192.168.49.2
+ubuntu@sharp-chinook:~/kubernetes-ingress/deployments$ curl 192.168.49.2
+<html>
+<head><title>404 Not Found</title></head>
+<body>
+<center><h1>404 Not Found</h1></center>
+<hr><center>nginx/1.21.5</center>
+</body>
+</html>
+#You are hitting the ingress controller but it has no config to deal with the request
+- curl to the product page ip from above command "k get pods -n bookinfo -o wide"
+curl 10.244.205.206:9080
+#Can't connect. This IP is inside the cluster
+- connect to container in the cluster bookinfo ns and run curl
+minikube kubectl -- exec -it $(minikube kubectl -- get pod -l app=ratings -n bookinfo -o jsonpath='{.items[0].metadata.name}') -n bookinfo -c ratings -- curl -I productpage:9080/productpage
+
+--EXPOSE APP VIA VIRTUAL SERVER
+- Choose name for your app...I chose book.info and create a host file entry mapping it to one of the IP's returned by running:
+k get pods -n nginx-ingress -o wide
+sudo vi /etc/hosts 
+#add
+192.168.49.2  book.info
+
+- Create Virtual Server that looks for requests to "book.info" with path "/"
+k apply -f  https://raw.githubusercontent.com/f5devcentral/NIC-SM-Sandbox---Fresh-Config/main/bookinfo-vs.yaml 
+k describe vs bookinfo-vs -n bookinfo
+curl book.info
+
+--REVIEW SERVICEMESH DASHBOARD
+#Get IP address off the ubuntu VM by running 
+ip a | grep enp0s2
+#This is the address you will be access via the browser on your MAC to hit the grafana dashboard
+k port-forward -n nginx-mesh --address=0.0.0.0 svc/grafana 3000:3000&
+while true; do nginx-meshctl top pods -n bookinfo; sleep 1; done
+#Access SM via Mac browser
+http://10.1.21.9:3000
+#On the ubuntu VM generate some requests. 
+while true; do curl -I book.info/productpage?u=normal; done
+#Review the traffic increase via the grafana dashboard. 
+
+
+
+--UNINSTALL NOTES
+- Remove Service Mesh
+k delete namespace bookinfo
+nginx-meshctl remove
+sudo rm -rf /usr/local/bin/nginx-meshctl
