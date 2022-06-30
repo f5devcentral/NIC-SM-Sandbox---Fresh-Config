@@ -1,0 +1,15 @@
+apiVersion: k8s.nginx.org/v1
+kind: VirtualServer
+metadata:
+  name: bookinfo-vs
+  namespace: bookinfo
+spec:
+  host: book.info 
+  upstreams:
+  - name: productpage
+    service: productpage
+    port: 9080
+  routes:
+  - path: /
+    action:
+      pass: productpage
