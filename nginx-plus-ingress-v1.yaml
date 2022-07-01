@@ -1,6 +1,6 @@
 #When installing NIC for the first time, the default manifest will need to be adjusted. The following changes were made to the default deployment manifest. 
 #Changed Replicas from 1 to 2 
-#Under podSpec set hostNetwork: true, 
+#Under podSpec set hostNetwork: true, - this sets the ingress controllers IP's as the Node IP/Port. 
 #Added Volumes, Volume Mounts, Args & Annotations: https://docs.nginx.com/nginx-service-mesh/tutorials/kic/deploy-with-kic/#install-with-manifests
 #Changed container image path - "private-registry.nginx.com/nginx-ic/"
 #Added imagePullSecret - The secret is created with your NGINX+ JWT token per the intructions. 
