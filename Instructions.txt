@@ -142,7 +142,7 @@ ip a | grep enp0s2
 #This is the address you will be access via the browser on your MAC to hit the grafana dashboard
 k port-forward -n nginx-mesh --address=0.0.0.0 svc/grafana 3000:3000&
 while true; do nginx-meshctl top pods -n bookinfo; sleep 1; done
-#Access SM via Mac browser
+#Access Grafana via Mac browser
 http://10.1.21.9:3000
 #On the ubuntu VM generate some requests. 
 while true; do curl -I book.info/productpage?u=normal; done
