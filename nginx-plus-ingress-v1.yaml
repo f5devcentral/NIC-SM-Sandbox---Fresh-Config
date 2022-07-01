@@ -2,7 +2,7 @@
 #Changed Replicas from 1 to 2 
 #Under podSpec set hostNetwork: true, 
 #Added Volumes, Volume Mounts, Args & Annotations: https://docs.nginx.com/nginx-service-mesh/tutorials/kic/deploy-with-kic/#install-with-manifests
-#Changed container image path
+#Changed container image path - "private-registry.nginx.com/nginx-ic/"
 #Added imagePullSecret - The secret is created with your NGINX+ JWT token per the intructions. 
 
 apiVersion: apps/v1
