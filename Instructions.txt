@@ -152,6 +152,6 @@ while true; do curl -I book.info/productpage?u=normal; done
 
 --UNINSTALL NOTES
 - Remove Service Mesh
-k delete namespace bookinfo
 nginx-meshctl remove
+k delete namespace bookinfo
 sudo rm -rf /usr/local/bin/nginx-meshctl
